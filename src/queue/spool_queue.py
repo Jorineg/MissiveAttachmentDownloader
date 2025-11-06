@@ -191,3 +191,4 @@ class SpoolQueue:
         self._current_item = item
         return item
 
+

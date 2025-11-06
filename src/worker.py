@@ -77,3 +77,4 @@ class Worker:
         
         logger.info("Worker thread stopped")
 
+

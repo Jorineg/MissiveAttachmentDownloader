@@ -101,6 +101,11 @@ class Poller:
     def _has_attachments(self, conversation: Dict[str, Any]) -> bool:
         """Check if a conversation has any attachments."""
         try:
+            # Check the attachments_count field if available
+            attachments_count = conversation.get("attachments_count", 0)
+            if attachments_count > 0:
+                return True
+            
             # Check the latest_message for attachments
             latest_message = conversation.get("latest_message", {})
             attachments = latest_message.get("attachments", [])
@@ -108,7 +113,13 @@ class Poller:
             if attachments and len(attachments) > 0:
                 return True
             
-            # Could also check message count but we'll rely on latest_message
+            # Log first conversation for debugging (only once)
+            if not hasattr(self, '_logged_sample'):
+                self._logged_sample = True
+                logger.debug(f"Sample conversation keys: {list(conversation.keys())}")
+                if latest_message:
+                    logger.debug(f"Sample latest_message keys: {list(latest_message.keys())}")
+            
             return False
         except Exception as e:
             logger.debug(f"Error checking for attachments: {e}")

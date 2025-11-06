@@ -86,15 +86,15 @@ The application will:
 
 ## Filename Format
 
-Attachments are saved with descriptive filenames:
+Attachments are saved with descriptive filenames based on sender, recipient, and original filename:
 
 ```
-FROM_john_doe_at_example.com_TO_jane_smith_at_company.com_NAME_invoice.pdf
+FROM_user_at_example.com_TO_recipient_at_company.com_NAME_invoice.pdf
 ```
 
 Format breakdown:
-- `FROM_` prefix followed by sender name and email
-- `TO_` prefix followed by recipient name and email  
+- `FROM_` prefix followed by sender email address
+- `TO_` prefix followed by recipient email address
 - `NAME_` prefix followed by original attachment filename
 - Email addresses use `_at_` instead of `@` for filesystem safety
 
@@ -224,4 +224,5 @@ MIT
 ## Support
 
 For issues and questions, check the application logs first. Enable debug logging with `LOG_LEVEL=DEBUG` for detailed information.
+
 
