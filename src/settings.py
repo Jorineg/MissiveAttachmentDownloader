@@ -26,6 +26,7 @@ MISSIVE_PROCESS_AFTER = os.getenv("MISSIVE_PROCESS_AFTER")  # Format: DD.MM.YYYY
 
 # Betterstack settings
 BETTERSTACK_SOURCE_TOKEN = os.getenv("BETTERSTACK_SOURCE_TOKEN")
+BETTERSTACK_INGEST_HOST = os.getenv("BETTERSTACK_INGEST_HOST")  # Optional: custom ingestion host
 
 # Attachment storage settings
 ATTACHMENT_STORAGE_PATH = os.getenv("ATTACHMENT_STORAGE_PATH")

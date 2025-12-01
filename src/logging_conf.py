@@ -30,10 +30,18 @@ logger.addHandler(file_handler)
 # Betterstack handler (if configured)
 if settings.BETTERSTACK_SOURCE_TOKEN:
     try:
-        betterstack_handler = LogtailHandler(source_token=settings.BETTERSTACK_SOURCE_TOKEN)
+        # Use custom host if provided, otherwise use default
+        handler_kwargs = {"source_token": settings.BETTERSTACK_SOURCE_TOKEN}
+        if settings.BETTERSTACK_INGEST_HOST:
+            handler_kwargs["host"] = settings.BETTERSTACK_INGEST_HOST
+        
+        betterstack_handler = LogtailHandler(**handler_kwargs)
+        betterstack_handler.setLevel(logging.DEBUG)  # Explicitly set handler level
         betterstack_handler.setFormatter(detailed_formatter)
         logger.addHandler(betterstack_handler)
-        logger.info("Betterstack logging enabled")
+        
+        host_info = settings.BETTERSTACK_INGEST_HOST or "default (in.logs.betterstack.com)"
+        logger.info(f"Betterstack logging enabled (host: {host_info})")
     except Exception as e:
         logger.warning(f"Failed to initialize Betterstack logging: {e}")
 else:
