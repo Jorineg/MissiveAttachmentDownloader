@@ -29,7 +29,7 @@ class Database:
         try:
             url = f"{self.base_url}/email_attachment_files"
             params = {
-                "select": "missive_attachment_id,missive_message_id,original_filename,original_url,file_size,retry_count",
+                "select": "missive_attachment_id,missive_message_id,original_filename,original_url,file_size,width,height,media_type,sub_type,retry_count",
                 "status": "eq.pending",
                 "retry_count": f"lt.{settings.MAX_RETRIES}",
                 "order": "created_at.asc",
@@ -79,6 +79,36 @@ class Database:
             logger.info(f"Completed: {local_filename}")
         except Exception as e:
             logger.error(f"Failed to mark completed {attachment_id}: {e}")
+    
+    def mark_skipped(self, attachment_id: str, reason: str) -> None:
+        """Mark attachment as skipped (not worth downloading)."""
+        try:
+            url = f"{self.base_url}/email_attachment_files"
+            params = {"missive_attachment_id": f"eq.{attachment_id}"}
+            now = datetime.now(timezone.utc).isoformat()
+            data = {
+                "status": "skipped",
+                "skip_reason": reason[:200],
+                "updated_at": now,
+            }
+            response = self._client.patch(url, headers=self.headers, params=params, json=data)
+            response.raise_for_status()
+            logger.info(f"Skipped: {attachment_id} - {reason}")
+        except Exception as e:
+            logger.error(f"Failed to mark skipped {attachment_id}: {e}")
+    
+    def update_url(self, attachment_id: str, new_url: str) -> None:
+        """Update the download URL with a fresh signed URL."""
+        try:
+            url = f"{self.base_url}/email_attachment_files"
+            params = {"missive_attachment_id": f"eq.{attachment_id}"}
+            now = datetime.now(timezone.utc).isoformat()
+            data = {"original_url": new_url, "updated_at": now}
+            response = self._client.patch(url, headers=self.headers, params=params, json=data)
+            response.raise_for_status()
+            logger.debug(f"Updated URL for {attachment_id}")
+        except Exception as e:
+            logger.error(f"Failed to update URL for {attachment_id}: {e}")
     
     def mark_failed(self, attachment_id: str, error: str) -> None:
         """Mark attachment as failed, increment retry count."""

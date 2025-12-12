@@ -5,6 +5,7 @@ services:
     environment:
       - SUPABASE_URL=${SUPABASE_URL}
       - SUPABASE_SERVICE_KEY=${SUPABASE_SERVICE_KEY}
+      - MISSIVE_API_TOKEN=${MISSIVE_API_TOKEN}
       - ATTACHMENT_STORAGE_PATH=/data/attachments
       - POLL_INTERVAL=${POLL_INTERVAL:-5}
       - BATCH_SIZE=${BATCH_SIZE:-10}

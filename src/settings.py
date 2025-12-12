@@ -19,6 +19,9 @@ BETTERSTACK_INGEST_HOST = os.getenv("BETTERSTACK_INGEST_HOST")
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY")
 
+# Missive API (for refreshing expired signed URLs)
+MISSIVE_API_TOKEN = os.getenv("MISSIVE_API_TOKEN")
+
 # Attachment storage
 ATTACHMENT_STORAGE_PATH = os.getenv("ATTACHMENT_STORAGE_PATH")
 
@@ -26,6 +29,10 @@ ATTACHMENT_STORAGE_PATH = os.getenv("ATTACHMENT_STORAGE_PATH")
 POLL_INTERVAL = int(os.getenv("POLL_INTERVAL", "5"))
 BATCH_SIZE = int(os.getenv("BATCH_SIZE", "10"))
 MAX_RETRIES = int(os.getenv("MAX_RETRIES", "3"))
+
+# Skip filter: images below these thresholds are skipped
+SKIP_IMAGE_MIN_SIZE = int(os.getenv("SKIP_IMAGE_MIN_SIZE", "25000"))  # 25KB
+SKIP_IMAGE_MIN_DIMENSION = int(os.getenv("SKIP_IMAGE_MIN_DIMENSION", "360"))  # 360px
 
 
 def validate_config():
@@ -36,6 +43,8 @@ def validate_config():
         errors.append("SUPABASE_URL is required")
     if not SUPABASE_SERVICE_KEY:
         errors.append("SUPABASE_SERVICE_KEY is required")
+    if not MISSIVE_API_TOKEN:
+        errors.append("MISSIVE_API_TOKEN is required")
     
     if not ATTACHMENT_STORAGE_PATH:
         errors.append("ATTACHMENT_STORAGE_PATH is required")

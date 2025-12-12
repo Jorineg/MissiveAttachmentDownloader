@@ -17,6 +17,7 @@ This service is **part of a pipeline**:
 - **Monthly folders** - Files organized as `YYYY-MM/filename`
 - **Unique filenames** - Format: `{original_name}_{attachment_id}.{ext}`
 - **Retry logic** - Failed downloads automatically retry
+- **Automatic URL refresh** - Fetches fresh signed URLs from Missive API when expired
 - **Docker-ready** - Designed for NAS deployment
 
 ## Quick Start (Docker)
@@ -38,6 +39,7 @@ Create a `.env` file:
 # Required
 SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_SERVICE_KEY=your-service-role-key
+MISSIVE_API_TOKEN=your-missive-api-token
 HOST_ATTACHMENT_PATH=/volume1/email_attachments
 
 # Optional
@@ -141,3 +143,11 @@ UPDATE email_attachment_files
 SET status = 'pending', retry_count = 0, error_message = NULL
 WHERE status = 'failed';
 ```
+
+### Expired URLs (403 errors)
+The downloader automatically handles expired signed URLs:
+1. Pre-checks URL expiry before download attempt
+2. On 403 error, fetches fresh URL from Missive API
+3. Updates `original_url` in DB and retries
+
+If you see persistent 403 errors, verify `MISSIVE_API_TOKEN` is valid.
