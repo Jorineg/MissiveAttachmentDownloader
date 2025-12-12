@@ -13,15 +13,17 @@ LOGS_DIR.mkdir(exist_ok=True)
 # Logging
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
 BETTERSTACK_SOURCE_TOKEN = os.getenv("BETTERSTACK_SOURCE_TOKEN")
+BETTERSTACK_INGEST_HOST = os.getenv("BETTERSTACK_INGEST_HOST")
 
-# Database connection
-DATABASE_URL = os.getenv("DATABASE_URL")
+# Supabase REST API
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY")
 
 # Attachment storage
 ATTACHMENT_STORAGE_PATH = os.getenv("ATTACHMENT_STORAGE_PATH")
 
 # Worker settings
-POLL_INTERVAL = int(os.getenv("POLL_INTERVAL", "5"))  # seconds between DB polls
+POLL_INTERVAL = int(os.getenv("POLL_INTERVAL", "5"))
 BATCH_SIZE = int(os.getenv("BATCH_SIZE", "10"))
 MAX_RETRIES = int(os.getenv("MAX_RETRIES", "3"))
 
@@ -30,8 +32,10 @@ def validate_config():
     """Validate required configuration."""
     errors = []
     
-    if not DATABASE_URL:
-        errors.append("DATABASE_URL is required")
+    if not SUPABASE_URL:
+        errors.append("SUPABASE_URL is required")
+    if not SUPABASE_SERVICE_KEY:
+        errors.append("SUPABASE_SERVICE_KEY is required")
     
     if not ATTACHMENT_STORAGE_PATH:
         errors.append("ATTACHMENT_STORAGE_PATH is required")

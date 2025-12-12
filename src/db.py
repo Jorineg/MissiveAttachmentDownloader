@@ -1,121 +1,146 @@
-"""Database operations for email attachment downloads."""
-import psycopg2
-from psycopg2.extras import RealDictCursor
-from typing import List, Optional, Dict, Any
-from contextlib import contextmanager
+"""Database operations via Supabase REST API."""
+import httpx
+from typing import List, Dict, Any
+from datetime import datetime, timezone, timedelta
 
 from src import settings
 from src.logging_conf import logger
 
 
 class Database:
-    """Database connection and operations for attachment downloads."""
+    """REST client for email attachment downloads."""
     
     def __init__(self):
-        self._conn = None
-    
-    @property
-    def conn(self):
-        """Get or create database connection."""
-        if self._conn is None or self._conn.closed:
-            self._conn = psycopg2.connect(settings.DATABASE_URL)
-        return self._conn
+        self.base_url = f"{settings.SUPABASE_URL}/rest/v1"
+        self.headers = {
+            "Authorization": f"Bearer {settings.SUPABASE_SERVICE_KEY}",
+            "apikey": settings.SUPABASE_SERVICE_KEY,
+            "Content-Type": "application/json",
+            "Prefer": "return=representation",
+        }
+        self._client = httpx.Client(timeout=30.0)
     
     def close(self):
-        """Close database connection."""
-        if self._conn and not self._conn.closed:
-            self._conn.close()
-            self._conn = None
-    
-    @contextmanager
-    def cursor(self):
-        """Context manager for cursor with auto-commit/rollback."""
-        cur = self.conn.cursor(cursor_factory=RealDictCursor)
-        try:
-            yield cur
-            self.conn.commit()
-        except Exception:
-            self.conn.rollback()
-            raise
-        finally:
-            cur.close()
+        """Close HTTP client."""
+        self._client.close()
     
     def get_pending_attachments(self, limit: int = 10) -> List[Dict[str, Any]]:
         """Fetch pending attachments for download."""
-        with self.cursor() as cur:
-            cur.execute("""
-                SELECT 
-                    missive_attachment_id,
-                    missive_message_id,
-                    original_filename,
-                    original_url,
-                    file_size,
-                    retry_count
-                FROM email_attachment_files
-                WHERE status = 'pending'
-                  AND (retry_count < %s)
-                ORDER BY created_at ASC
-                LIMIT %s
-            """, (settings.MAX_RETRIES, limit))
-            return cur.fetchall()
+        try:
+            url = f"{self.base_url}/email_attachment_files"
+            params = {
+                "select": "missive_attachment_id,missive_message_id,original_filename,original_url,file_size,retry_count",
+                "status": "eq.pending",
+                "retry_count": f"lt.{settings.MAX_RETRIES}",
+                "order": "created_at.asc",
+                "limit": str(limit),
+            }
+            response = self._client.get(url, headers=self.headers, params=params)
+            response.raise_for_status()
+            return response.json()
+        except Exception as e:
+            logger.error(f"Failed to fetch pending attachments: {e}")
+            return []
     
     def mark_downloading(self, attachment_id: str) -> bool:
-        """Mark attachment as currently downloading (atomic claim)."""
-        with self.cursor() as cur:
-            cur.execute("""
-                UPDATE email_attachment_files
-                SET status = 'downloading', updated_at = NOW()
-                WHERE missive_attachment_id = %s AND status = 'pending'
-                RETURNING missive_attachment_id
-            """, (attachment_id,))
-            return cur.fetchone() is not None
+        """Mark attachment as currently downloading (claim it)."""
+        try:
+            url = f"{self.base_url}/email_attachment_files"
+            params = {
+                "missive_attachment_id": f"eq.{attachment_id}",
+                "status": "eq.pending",
+            }
+            now = datetime.now(timezone.utc).isoformat()
+            data = {"status": "downloading", "updated_at": now}
+            
+            response = self._client.patch(url, headers=self.headers, params=params, json=data)
+            response.raise_for_status()
+            result = response.json()
+            return len(result) > 0
+        except Exception as e:
+            logger.error(f"Failed to mark downloading {attachment_id}: {e}")
+            return False
     
     def mark_completed(self, attachment_id: str, local_filename: str) -> None:
         """Mark attachment as successfully downloaded."""
-        with self.cursor() as cur:
-            cur.execute("""
-                UPDATE email_attachment_files
-                SET status = 'completed',
-                    local_filename = %s,
-                    downloaded_at = NOW(),
-                    updated_at = NOW(),
-                    error_message = NULL
-                WHERE missive_attachment_id = %s
-            """, (local_filename, attachment_id))
-        logger.info(f"Completed: {local_filename}")
+        try:
+            url = f"{self.base_url}/email_attachment_files"
+            params = {"missive_attachment_id": f"eq.{attachment_id}"}
+            now = datetime.now(timezone.utc).isoformat()
+            data = {
+                "status": "completed",
+                "local_filename": local_filename,
+                "downloaded_at": now,
+                "updated_at": now,
+                "error_message": None,
+            }
+            response = self._client.patch(url, headers=self.headers, params=params, json=data)
+            response.raise_for_status()
+            logger.info(f"Completed: {local_filename}")
+        except Exception as e:
+            logger.error(f"Failed to mark completed {attachment_id}: {e}")
     
     def mark_failed(self, attachment_id: str, error: str) -> None:
         """Mark attachment as failed, increment retry count."""
-        with self.cursor() as cur:
-            cur.execute("""
-                UPDATE email_attachment_files
-                SET status = 'pending',
-                    retry_count = retry_count + 1,
-                    error_message = %s,
-                    updated_at = NOW()
-                WHERE missive_attachment_id = %s
-            """, (error, attachment_id))
+        try:
+            # First get current retry_count
+            url = f"{self.base_url}/email_attachment_files"
+            params = {
+                "missive_attachment_id": f"eq.{attachment_id}",
+                "select": "retry_count",
+            }
+            response = self._client.get(url, headers=self.headers, params=params)
+            response.raise_for_status()
+            result = response.json()
             
-            # Check if max retries exceeded
-            cur.execute("""
-                UPDATE email_attachment_files
-                SET status = 'failed'
-                WHERE missive_attachment_id = %s AND retry_count >= %s
-            """, (attachment_id, settings.MAX_RETRIES))
-        logger.warning(f"Failed: {attachment_id} - {error}")
+            if not result:
+                logger.warning(f"Attachment not found: {attachment_id}")
+                return
+            
+            current_retry = result[0].get("retry_count", 0)
+            new_retry = current_retry + 1
+            
+            # Determine status based on retry count
+            status = "failed" if new_retry >= settings.MAX_RETRIES else "pending"
+            
+            now = datetime.now(timezone.utc).isoformat()
+            data = {
+                "status": status,
+                "retry_count": new_retry,
+                "error_message": error[:500],
+                "updated_at": now,
+            }
+            
+            response = self._client.patch(
+                url, headers=self.headers,
+                params={"missive_attachment_id": f"eq.{attachment_id}"},
+                json=data
+            )
+            response.raise_for_status()
+            logger.warning(f"Failed: {attachment_id} - {error}")
+        except Exception as e:
+            logger.error(f"Failed to mark failed {attachment_id}: {e}")
     
     def reset_stuck_downloads(self, minutes: int = 30) -> int:
         """Reset downloads stuck in 'downloading' state."""
-        with self.cursor() as cur:
-            cur.execute("""
-                UPDATE email_attachment_files
-                SET status = 'pending', updated_at = NOW()
-                WHERE status = 'downloading'
-                  AND updated_at < NOW() - INTERVAL '%s minutes'
-                RETURNING missive_attachment_id
-            """, (minutes,))
-            count = len(cur.fetchall())
+        try:
+            cutoff = (datetime.now(timezone.utc) - timedelta(minutes=minutes)).isoformat()
+            url = f"{self.base_url}/email_attachment_files"
+            params = {
+                "status": "eq.downloading",
+                "updated_at": f"lt.{cutoff}",
+            }
+            now = datetime.now(timezone.utc).isoformat()
+            data = {"status": "pending", "updated_at": now}
+            
+            response = self._client.patch(url, headers=self.headers, params=params, json=data)
+            response.raise_for_status()
+            result = response.json()
+            count = len(result)
+            
             if count > 0:
                 logger.warning(f"Reset {count} stuck downloads")
             return count
-
+        except Exception as e:
+            logger.error(f"Failed to reset stuck downloads: {e}")
+            return 0

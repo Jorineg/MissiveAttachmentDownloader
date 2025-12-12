@@ -12,7 +12,7 @@ This service is **part of a pipeline**:
 
 ## Features
 
-- **DB-driven queue** - No Missive API polling, works from `email_attachment_files` table
+- **Supabase REST API** - No direct DB connection needed
 - **Atomic claims** - Multiple workers can run without conflicts
 - **Monthly folders** - Files organized as `YYYY-MM/filename`
 - **Unique filenames** - Format: `{original_name}_{attachment_id}.{ext}`
@@ -24,7 +24,7 @@ This service is **part of a pipeline**:
 ```bash
 # Create .env from example
 cp env.example .env
-# Edit .env with your DATABASE_URL and paths
+# Edit .env with your Supabase credentials and paths
 
 # Run
 docker-compose up -d
@@ -36,7 +36,8 @@ Create a `.env` file:
 
 ```env
 # Required
-DATABASE_URL=postgresql://user:password@host:5432/database
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_SERVICE_KEY=your-service-role-key
 HOST_ATTACHMENT_PATH=/volume1/email_attachments
 
 # Optional
