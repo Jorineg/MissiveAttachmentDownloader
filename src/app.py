@@ -1,80 +1,99 @@
-"""Main application entry point."""
+"""Main application - polls DB for pending attachments and downloads them."""
 import signal
 import sys
 import time
 
 from src.logging_conf import logger
 from src import settings
-from src.poller import Poller
-from src.worker import Worker
+from src.db import Database
+from src.attachment_processor import AttachmentProcessor
 
 
 class Application:
-    """Main application that coordinates poller and worker."""
+    """Main application that polls DB and processes attachments."""
     
     def __init__(self):
-        self.poller = Poller()
-        self.worker = Worker()
+        self.db = Database()
+        self.processor = AttachmentProcessor()
         self.running = False
     
     def start(self):
         """Start the application."""
-        logger.info("=" * 60)
+        logger.info("=" * 50)
         logger.info("Missive Attachment Downloader")
-        logger.info("=" * 60)
-        logger.info(f"Storage path: {settings.ATTACHMENT_STORAGE_PATH}")
-        logger.info(f"Polling interval: {settings.POLLING_INTERVAL}s")
-        logger.info(f"Timezone: {settings.TIMEZONE}")
-        logger.info("=" * 60)
+        logger.info("=" * 50)
+        logger.info(f"Storage: {settings.ATTACHMENT_STORAGE_PATH}")
+        logger.info(f"Poll interval: {settings.POLL_INTERVAL}s")
+        logger.info("=" * 50)
         
-        # Validate configuration
-        try:
-            settings.validate_config()
-            logger.info("Configuration validated successfully")
-        except ValueError as e:
-            logger.error(f"Configuration error: {e}")
-            sys.exit(1)
-        
-        # Start components
+        settings.validate_config()
         self.running = True
-        self.worker.start()
-        self.poller.start()
-        
-        logger.info("Application started successfully")
-        logger.info("Press Ctrl+C to stop")
+        logger.info("Started - watching for pending attachments")
     
     def stop(self):
         """Stop the application."""
         if not self.running:
             return
-        
-        logger.info("Shutting down...")
         self.running = False
-        
-        self.poller.stop()
-        self.worker.stop()
-        
-        logger.info("Application stopped")
+        self.db.close()
+        logger.info("Stopped")
     
     def run(self):
-        """Run the application until interrupted."""
+        """Main loop."""
         self.start()
         
-        # Wait for interrupt
-        try:
-            while self.running:
-                time.sleep(1)
-        except KeyboardInterrupt:
-            logger.info("Received interrupt signal")
-        finally:
-            self.stop()
+        # Reset any stuck downloads on startup
+        self.db.reset_stuck_downloads()
+        
+        while self.running:
+            try:
+                processed = self._process_batch()
+                
+                # If no work, sleep before next poll
+                if not processed:
+                    time.sleep(settings.POLL_INTERVAL)
+                    
+            except KeyboardInterrupt:
+                break
+            except Exception as e:
+                logger.error(f"Error in main loop: {e}", exc_info=True)
+                time.sleep(5)
+        
+        self.stop()
+    
+    def _process_batch(self) -> int:
+        """Process a batch of pending attachments. Returns count processed."""
+        attachments = self.db.get_pending_attachments(settings.BATCH_SIZE)
+        
+        if not attachments:
+            return 0
+        
+        processed = 0
+        for attachment in attachments:
+            if not self.running:
+                break
+            
+            attachment_id = attachment['missive_attachment_id']
+            
+            # Try to claim this attachment
+            if not self.db.mark_downloading(attachment_id):
+                continue  # Already claimed by another worker
+            
+            try:
+                local_filename = self.processor.process(attachment)
+                self.db.mark_completed(attachment_id, local_filename)
+                processed += 1
+                
+            except Exception as e:
+                self.db.mark_failed(attachment_id, str(e)[:500])
+        
+        return processed
 
 
 def main():
-    """Main entry point."""
+    """Entry point."""
     app = Application()
     
-    # Handle signals
     def signal_handler(sig, frame):
         logger.info(f"Received signal {sig}")
         app.stop()
@@ -83,11 +102,12 @@ def main():
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
     
-    # Run application
-    app.run()
+    try:
+        app.run()
+    except ValueError as e:
+        logger.error(f"Configuration error: {e}")
+        sys.exit(1)
 
 
 if __name__ == "__main__":
     main()
-
-
