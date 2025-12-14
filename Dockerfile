@@ -1,14 +1,10 @@
-FROM python:3.11-slim
+FROM jorineg/ibhelm-base:latest
 
-WORKDIR /app
-
-# Install dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy source
 COPY src/ src/
 
-# Run
-CMD ["python", "-m", "src.app"]
+ENV SERVICE_NAME=missiveattachmentdownloader
 
+CMD ["python", "-m", "src.app"]
