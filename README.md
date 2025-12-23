@@ -4,11 +4,15 @@ A Docker-based worker that downloads email attachments from Missive to NAS stora
 
 ## Architecture
 
-This service is **part of a pipeline**:
+This service is a critical worker in the IBHelm file ingestion pipeline:
 
-1. **TeamworkMissiveConnector** syncs Missive data → inserts into `missive.attachments` → queues downloads in `email_attachment_files`
-2. **MissiveAttachmentDownloader** (this service) watches the queue → downloads files to NAS
-3. **FileMetadataSync** scans NAS → matches files to attachments via `local_filename`
+```
+TeamworkMissiveConnector → email_attachment_files (Queue) → MissiveAttachmentDownloader → NAS Storage → FileMetadataSync
+```
+
+1. **TeamworkMissiveConnector** syncs Missive data → inserts into `missive.attachments` → queues downloads in `email_attachment_files`.
+2. **MissiveAttachmentDownloader** (this service) watches the queue → downloads files to NAS.
+3. **FileMetadataSync** scans NAS → matches physical files to database records via `local_filename`.
 
 ## Features
 
