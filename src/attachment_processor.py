@@ -21,14 +21,14 @@ class AttachmentProcessor:
     
     def process(self, attachment: Dict[str, Any], db=None) -> str:
         """
-        Download attachment and return the local filename.
+        Download attachment and return the local filename (relative to storage root).
         
         Args:
-            attachment: Dict with missive_attachment_id, missive_message_id, original_filename, original_url
+            attachment: Dict with attachment info including project_name, delivered_at, sender_email
             db: Database instance for updating URL if refreshed
             
         Returns:
-            The local_filename (just filename, not full path)
+            The relative path: {project}/{filename}
             
         Raises:
             Exception on download failure
@@ -37,21 +37,25 @@ class AttachmentProcessor:
         message_id = attachment['missive_message_id']
         original_filename = attachment['original_filename']
         url = attachment['original_url']
+        project_name = attachment.get('project_name') or 'Unknown'
+        delivered_at = attachment.get('delivered_at')
+        sender_email = attachment.get('sender_email') or 'unknown'
         
-        # Generate unique filename: {name}_{attachment_id}.{ext}
-        local_filename = self._generate_filename(original_filename, attachment_id)
+        # Generate filename: {dd-mm-yyyy}_{sender}_{name}_{uuid}.{ext}
+        local_filename = self._generate_filename(original_filename, attachment_id, delivered_at, sender_email)
         
-        # Get monthly folder: YYYY-MM
-        month_folder = datetime.now().strftime("%Y-%m")
-        folder_path = self.storage_path / month_folder
+        # Project folder (sanitized)
+        project_folder = self._sanitize_folder(project_name)
+        folder_path = self.storage_path / project_folder
         folder_path.mkdir(parents=True, exist_ok=True)
         
         file_path = folder_path / local_filename
+        relative_path = f"{project_folder}/{local_filename}"
         
         # Skip if already exists
         if file_path.exists():
-            logger.info(f"Already exists: {local_filename}")
-            return local_filename
+            logger.info(f"Already exists: {relative_path}")
+            return relative_path
         
         # Check if URL is expired, refresh preemptively
         if self._is_url_expired(url):
@@ -59,15 +63,15 @@ class AttachmentProcessor:
             url = self._refresh_url(attachment_id, message_id, db)
         
         # Download with retry on 403
-        logger.info(f"Downloading: {local_filename}")
+        logger.info(f"Downloading: {relative_path}")
         content, url_refreshed = self._download_with_refresh(url, attachment_id, message_id, db)
         
         # Save
         with open(file_path, 'wb') as f:
             f.write(content)
         
-        logger.info(f"Saved: {local_filename} ({len(content)} bytes)")
-        return local_filename
+        logger.info(f"Saved: {relative_path} ({len(content)} bytes)")
+        return relative_path
     
     def _is_url_expired(self, url: str, buffer_seconds: int = 60) -> bool:
         """Check if signed URL is expired or will expire soon."""
@@ -105,12 +109,26 @@ class AttachmentProcessor:
                 return self._download(fresh_url), True
             raise
     
-    def _generate_filename(self, original_filename: str, attachment_id: str) -> str:
+    def _generate_filename(self, original_filename: str, attachment_id: str, 
+                           delivered_at: Optional[str], sender_email: str) -> str:
         """
-        Generate filename: {sanitized_name}_{attachment_id}.{ext}
+        Generate filename: {dd-mm-yyyy}_{sender}_{name}_{uuid}.{ext}
         
-        Example: Invoice-December_0001f0d0-0c46-4036-84c7-c493a226a993.pdf
+        Example: 14-01-2025_john@example.com_Invoice_0001f0d0-0c46-4036-84c7-c493a226a993.pdf
         """
+        # Parse delivered_at date
+        if delivered_at:
+            try:
+                dt = datetime.fromisoformat(str(delivered_at).replace('Z', '+00:00'))
+                date_str = dt.strftime("%d-%m-%Y")
+            except (ValueError, TypeError):
+                date_str = "00-00-0000"
+        else:
+            date_str = "00-00-0000"
+        
+        # Sanitize sender email (keep @ and .)
+        sender = re.sub(r'[^A-Za-z0-9@._-]', '_', sender_email)[:50]
+        
         # Split into name and extension
         if '.' in original_filename:
             name, ext = original_filename.rsplit('.', 1)
@@ -123,9 +141,10 @@ class AttachmentProcessor:
         name = self._sanitize(name)
         
         # Build filename
+        base = f"{date_str}_{sender}_{name}_{attachment_id}"
         if ext:
-            return f"{name}_{attachment_id}.{ext}"
-        return f"{name}_{attachment_id}"
+            return f"{base}.{ext}"
+        return base
     
     def _sanitize(self, name: str) -> str:
         """Sanitize filename component."""
@@ -138,6 +157,13 @@ class AttachmentProcessor:
         name = name.strip('-_')
         # Limit length
         return name[:100] if name else 'attachment'
+    
+    def _sanitize_folder(self, name: str) -> str:
+        """Sanitize folder name (more permissive than filename)."""
+        # Keep spaces, replace only truly unsafe chars
+        name = re.sub(r'[<>:"/\\|?*\x00-\x1f]', '_', name)
+        name = name.strip(' .')
+        return name[:200] if name else 'Unknown'
     
     def _download(self, url: str) -> bytes:
         """Download file from URL."""
