@@ -67,9 +67,15 @@ class Application:
     SKIP_TYPES = {
         ('application', 'pgp-signature'),
         ('application', 'pkcs7-signature'),
+        ('application', 'pkcs7-mime'),
+        ('application', 'x-pkcs7-signature'),
         ('text', 'calendar'),
+        ('text', 'vcard'),
         ('application', 'ics'),
     }
+    
+    # Skip files with these extensions (case-insensitive)
+    SKIP_EXTENSIONS = {'.p7s', '.ics', '.vcf'}
     
     def _should_skip(self, attachment: dict) -> str | None:
         """Check if attachment should be skipped. Returns skip reason or None."""
@@ -80,10 +86,16 @@ class Application:
                 if sender_email.endswith(domain):
                     return "outgoing email: attachments are only downloaded for incoming emails"
         
+        filename = (attachment.get('original_filename') or '').lower()
         media_type = attachment.get('media_type')
         sub_type = attachment.get('sub_type')
         
-        # Skip signatures and calendar invites
+        # Skip by extension (catches mistyped MIME types like smime.p7s as octet-stream)
+        for ext in self.SKIP_EXTENSIONS:
+            if filename.endswith(ext):
+                return f"skip extension: {ext}"
+        
+        # Skip signatures, calendar invites, contact cards
         if (media_type, sub_type) in self.SKIP_TYPES:
             return f"skip type: {media_type}/{sub_type}"
         
