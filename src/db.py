@@ -25,17 +25,11 @@ class Database:
         self._client.close()
     
     def get_pending_attachments(self, limit: int = 10) -> List[Dict[str, Any]]:
-        """Fetch pending attachments for download."""
+        """Fetch pending attachments for download (only project-linked emails)."""
         try:
-            url = f"{self.base_url}/email_attachment_files"
-            params = {
-                "select": "missive_attachment_id,missive_message_id,original_filename,original_url,file_size,width,height,media_type,sub_type,retry_count",
-                "status": "eq.pending",
-                "retry_count": f"lt.{settings.MAX_RETRIES}",
-                "order": "created_at.asc",
-                "limit": str(limit),
-            }
-            response = self._client.get(url, headers=self.headers, params=params)
+            url = f"{self.base_url}/rpc/get_pending_project_attachments"
+            data = {"p_limit": limit, "p_max_retries": settings.MAX_RETRIES}
+            response = self._client.post(url, headers=self.headers, json=data)
             response.raise_for_status()
             return response.json()
         except Exception as e:
