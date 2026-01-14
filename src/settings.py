@@ -34,6 +34,13 @@ MAX_RETRIES = int(os.getenv("MAX_RETRIES", "3"))
 SKIP_IMAGE_MIN_SIZE = int(os.getenv("SKIP_IMAGE_MIN_SIZE", "25000"))  # 25KB
 SKIP_IMAGE_MIN_DIMENSION = int(os.getenv("SKIP_IMAGE_MIN_DIMENSION", "360"))  # 360px
 
+# Skip outgoing emails: comma-separated list of sender domain suffixes
+# e.g., "@ibhelm.de,@ibhelm.com" - emails from these domains are skipped
+SKIP_SENDER_DOMAINS = [d.strip().lower() for d in os.getenv("SKIP_SENDER_DOMAINS", "").split(",") if d.strip()]
+
+# Max subject length in folder name
+MAX_SUBJECT_LENGTH = int(os.getenv("MAX_SUBJECT_LENGTH", "50"))
+
 
 def validate_config():
     """Validate required configuration."""

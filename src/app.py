@@ -24,6 +24,8 @@ class Application:
         logger.info("=" * 50)
         logger.info(f"Storage: {settings.ATTACHMENT_STORAGE_PATH}")
         logger.info(f"Poll interval: {settings.POLL_INTERVAL}s")
+        if settings.SKIP_SENDER_DOMAINS:
+            logger.info(f"Skip outgoing from: {', '.join(settings.SKIP_SENDER_DOMAINS)}")
         logger.info("=" * 50)
         
         settings.validate_config()
@@ -71,6 +73,13 @@ class Application:
     
     def _should_skip(self, attachment: dict) -> str | None:
         """Check if attachment should be skipped. Returns skip reason or None."""
+        # Skip outgoing emails (sender matches configured domains)
+        sender_email = (attachment.get('sender_email') or '').lower()
+        if sender_email and settings.SKIP_SENDER_DOMAINS:
+            for domain in settings.SKIP_SENDER_DOMAINS:
+                if sender_email.endswith(domain):
+                    return "outgoing email: attachments are only downloaded for incoming emails"
+        
         media_type = attachment.get('media_type')
         sub_type = attachment.get('sub_type')
         
