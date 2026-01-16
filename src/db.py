@@ -1,4 +1,4 @@
-"""Database operations via Supabase REST API."""
+"""Database operations via PostgREST API."""
 import httpx
 from typing import List, Dict, Any
 from datetime import datetime, timezone, timedelta
@@ -8,13 +8,12 @@ from src.logging_conf import logger
 
 
 class Database:
-    """REST client for email attachment downloads."""
+    """REST client for email attachment downloads via dedicated PostgREST instance."""
     
     def __init__(self):
-        self.base_url = f"{settings.SUPABASE_URL}/rest/v1"
+        self.base_url = settings.POSTGREST_URL
         self.headers = {
-            "Authorization": f"Bearer {settings.SUPABASE_SERVICE_KEY}",
-            "apikey": settings.SUPABASE_SERVICE_KEY,
+            "X-API-Key": settings.MAD_SERVICE_SECRET,
             "Content-Type": "application/json",
             "Prefer": "return=representation",
         }

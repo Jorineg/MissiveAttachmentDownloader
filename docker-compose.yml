@@ -2,19 +2,27 @@ services:
   attachment-downloader:
     build: .
     restart: unless-stopped
+    env_file:
+      - .env
     environment:
-      - SUPABASE_URL=${SUPABASE_URL}
-      - SUPABASE_SERVICE_KEY=${SUPABASE_SERVICE_KEY}
+      # PostgREST API (database operations)
+      - POSTGREST_URL=${POSTGREST_URL}
+      - MAD_SERVICE_SECRET=${MAD_SERVICE_SECRET}
+      # Missive API
       - MISSIVE_API_TOKEN=${MISSIVE_API_TOKEN}
+      # Storage
       - ATTACHMENT_STORAGE_PATH=/data/attachments
+      # Worker settings
       - POLL_INTERVAL=${POLL_INTERVAL:-5}
       - BATCH_SIZE=${BATCH_SIZE:-10}
       - MAX_RETRIES=${MAX_RETRIES:-3}
+      # Filters
+      - SKIP_SENDER_DOMAINS=${SKIP_SENDER_DOMAINS:-}
+      - MAX_SUBJECT_LENGTH=${MAX_SUBJECT_LENGTH:-50}
+      # Logging
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
       - BETTERSTACK_SOURCE_TOKEN=${BETTERSTACK_SOURCE_TOKEN:-}
       - BETTERSTACK_INGEST_HOST=${BETTERSTACK_INGEST_HOST:-}
-      - SKIP_SENDER_DOMAINS=${SKIP_SENDER_DOMAINS:-}
-      - MAX_SUBJECT_LENGTH=${MAX_SUBJECT_LENGTH:-50}
     volumes:
       - ${HOST_ATTACHMENT_PATH}:/data/attachments
       - ./logs:/app/logs

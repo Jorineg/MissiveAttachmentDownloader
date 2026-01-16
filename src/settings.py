@@ -15,9 +15,11 @@ LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
 BETTERSTACK_SOURCE_TOKEN = os.getenv("BETTERSTACK_SOURCE_TOKEN")
 BETTERSTACK_INGEST_HOST = os.getenv("BETTERSTACK_INGEST_HOST")
 
-# Supabase REST API
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY")
+# PostgREST API (database operations)
+# MAD_SERVICE_SECRET is used as X-API-Key header for PostgREST proxy auth
+# (same secret is also the mad_downloader DB role password on server side)
+POSTGREST_URL = os.getenv("POSTGREST_URL")
+MAD_SERVICE_SECRET = os.getenv("MAD_SERVICE_SECRET")
 
 # Missive API (for refreshing expired signed URLs)
 MISSIVE_API_TOKEN = os.getenv("MISSIVE_API_TOKEN")
@@ -34,8 +36,7 @@ MAX_RETRIES = int(os.getenv("MAX_RETRIES", "3"))
 SKIP_IMAGE_MIN_SIZE = int(os.getenv("SKIP_IMAGE_MIN_SIZE", "25000"))  # 25KB
 SKIP_IMAGE_MIN_DIMENSION = int(os.getenv("SKIP_IMAGE_MIN_DIMENSION", "360"))  # 360px
 
-# Skip outgoing emails: comma-separated list of sender domain suffixes
-# e.g., "@ibhelm.de,@ibhelm.com" - emails from these domains are skipped
+# Skip outgoing emails
 SKIP_SENDER_DOMAINS = [d.strip().lower() for d in os.getenv("SKIP_SENDER_DOMAINS", "").split(",") if d.strip()]
 
 # Max subject length in folder name
@@ -46,10 +47,10 @@ def validate_config():
     """Validate required configuration."""
     errors = []
     
-    if not SUPABASE_URL:
-        errors.append("SUPABASE_URL is required")
-    if not SUPABASE_SERVICE_KEY:
-        errors.append("SUPABASE_SERVICE_KEY is required")
+    if not POSTGREST_URL:
+        errors.append("POSTGREST_URL is required")
+    if not MAD_SERVICE_SECRET:
+        errors.append("MAD_SERVICE_SECRET is required")
     if not MISSIVE_API_TOKEN:
         errors.append("MISSIVE_API_TOKEN is required")
     
