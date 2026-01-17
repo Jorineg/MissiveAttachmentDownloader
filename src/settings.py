@@ -35,6 +35,8 @@ MAX_RETRIES = int(os.getenv("MAX_RETRIES", "3"))
 # Skip filter: images below these thresholds are skipped
 SKIP_IMAGE_MIN_SIZE = int(os.getenv("SKIP_IMAGE_MIN_SIZE", "25000"))  # 25KB
 SKIP_IMAGE_MIN_DIMENSION = int(os.getenv("SKIP_IMAGE_MIN_DIMENSION", "360"))  # 360px
+SKIP_IMAGE_MAX_ASPECT_RATIO = float(os.getenv("SKIP_IMAGE_MAX_ASPECT_RATIO", "2.0"))  # Skip if wider than 2:1
+SKIP_IMAGE_BANNER_MAX_SIZE = int(os.getenv("SKIP_IMAGE_BANNER_MAX_SIZE", "150000"))  # 150KB - banners below this + wide aspect are skipped
 
 # Skip outgoing emails
 SKIP_SENDER_DOMAINS = [d.strip().lower() for d in os.getenv("SKIP_SENDER_DOMAINS", "").split(",") if d.strip()]

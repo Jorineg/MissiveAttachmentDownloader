@@ -75,7 +75,7 @@ class Application:
     }
     
     # Skip files with these extensions (case-insensitive)
-    SKIP_EXTENSIONS = {'.p7s', '.ics', '.vcf'}
+    SKIP_EXTENSIONS = {'.p7s', '.p7m', '.ics', '.vcf'}
     
     def _should_skip(self, attachment: dict) -> str | None:
         """Check if attachment should be skipped. Returns skip reason or None."""
@@ -113,6 +113,12 @@ class Application:
             if width and height:
                 if width < settings.SKIP_IMAGE_MIN_DIMENSION or height < settings.SKIP_IMAGE_MIN_DIMENSION:
                     return f"image too small: {width}x{height}px"
+                
+                # Skip wide banner/signature images (aspect ratio > 2:1 and small file)
+                if height > 0 and file_size:
+                    aspect_ratio = width / height
+                    if aspect_ratio > settings.SKIP_IMAGE_MAX_ASPECT_RATIO and file_size < settings.SKIP_IMAGE_BANNER_MAX_SIZE:
+                        return f"banner/signature image: {width}x{height}px ({aspect_ratio:.1f}:1)"
         
         return None
     
