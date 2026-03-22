@@ -24,8 +24,10 @@ MAD_SERVICE_SECRET = os.getenv("MAD_SERVICE_SECRET")
 # Missive API (for refreshing expired signed URLs)
 MISSIVE_API_TOKEN = os.getenv("MISSIVE_API_TOKEN")
 
-# Attachment storage
-ATTACHMENT_STORAGE_PATH = os.getenv("ATTACHMENT_STORAGE_PATH")
+# Attachment storage — comma-separated list of base paths to search for project folders
+# First match wins; error if project folder not found in any path
+_storage_paths_raw = os.getenv("ATTACHMENT_STORAGE_PATHS", "")
+ATTACHMENT_STORAGE_PATHS = [Path(p.strip()) for p in _storage_paths_raw.split(",") if p.strip()]
 
 # Worker settings
 POLL_INTERVAL = int(os.getenv("POLL_INTERVAL", "5"))
@@ -35,8 +37,8 @@ MAX_RETRIES = int(os.getenv("MAX_RETRIES", "3"))
 # Skip filter: images below these thresholds are skipped
 SKIP_IMAGE_MIN_SIZE = int(os.getenv("SKIP_IMAGE_MIN_SIZE", "25000"))  # 25KB
 SKIP_IMAGE_MIN_DIMENSION = int(os.getenv("SKIP_IMAGE_MIN_DIMENSION", "360"))  # 360px
-SKIP_IMAGE_MAX_ASPECT_RATIO = float(os.getenv("SKIP_IMAGE_MAX_ASPECT_RATIO", "2.0"))  # Skip if wider than 2:1
-SKIP_IMAGE_BANNER_MAX_SIZE = int(os.getenv("SKIP_IMAGE_BANNER_MAX_SIZE", "150000"))  # 150KB - banners below this + wide aspect are skipped
+SKIP_IMAGE_MAX_ASPECT_RATIO = float(os.getenv("SKIP_IMAGE_MAX_ASPECT_RATIO", "2.0"))
+SKIP_IMAGE_BANNER_MAX_SIZE = int(os.getenv("SKIP_IMAGE_BANNER_MAX_SIZE", "150000"))  # 150KB
 
 # Skip outgoing emails
 SKIP_SENDER_DOMAINS = [d.strip().lower() for d in os.getenv("SKIP_SENDER_DOMAINS", "").split(",") if d.strip()]
@@ -56,17 +58,14 @@ def validate_config():
     if not MISSIVE_API_TOKEN:
         errors.append("MISSIVE_API_TOKEN is required")
     
-    if not ATTACHMENT_STORAGE_PATH:
-        errors.append("ATTACHMENT_STORAGE_PATH is required")
+    if not ATTACHMENT_STORAGE_PATHS:
+        errors.append("ATTACHMENT_STORAGE_PATHS is required (comma-separated list of paths)")
     else:
-        storage_path = Path(ATTACHMENT_STORAGE_PATH)
-        if not storage_path.is_absolute():
-            errors.append(f"ATTACHMENT_STORAGE_PATH must be absolute: {ATTACHMENT_STORAGE_PATH}")
-        else:
-            try:
-                storage_path.mkdir(parents=True, exist_ok=True)
-            except Exception as e:
-                errors.append(f"Cannot create ATTACHMENT_STORAGE_PATH: {e}")
+        for p in ATTACHMENT_STORAGE_PATHS:
+            if not p.is_absolute():
+                errors.append(f"Storage path must be absolute: {p}")
+            elif not p.exists():
+                errors.append(f"Storage path does not exist: {p}")
     
     if errors:
         raise ValueError("Config errors:\n  " + "\n  ".join(errors))

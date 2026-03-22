@@ -2,6 +2,9 @@ services:
   attachment-downloader:
     build: .
     restart: unless-stopped
+    user: "1029:100"
+    extra_hosts:
+      - "ibhelm.local:192.168.178.38"
     env_file:
       - .env
     environment:
@@ -10,8 +13,8 @@ services:
       - MAD_SERVICE_SECRET=${MAD_SERVICE_SECRET}
       # Missive API
       - MISSIVE_API_TOKEN=${MISSIVE_API_TOKEN}
-      # Storage
-      - ATTACHMENT_STORAGE_PATH=/data/attachments
+      # Storage — comma-separated list of mount paths to search for project folders
+      - ATTACHMENT_STORAGE_PATHS=/data/projekte,/data/projekte-erledigt
       # Worker settings
       - POLL_INTERVAL=${POLL_INTERVAL:-5}
       - BATCH_SIZE=${BATCH_SIZE:-10}
@@ -24,5 +27,7 @@ services:
       - BETTERSTACK_SOURCE_TOKEN=${BETTERSTACK_SOURCE_TOKEN:-}
       - BETTERSTACK_INGEST_HOST=${BETTERSTACK_INGEST_HOST:-}
     volumes:
-      - ${HOST_ATTACHMENT_PATH}:/data/attachments
+      - /volume1/_shared-ibhelm/projekte:/data/projekte
+      - /volume1/_shared-ibhelm/projekte-erledigt:/data/projekte-erledigt
       - ./logs:/app/logs
+      - /usr/syno/bin/synoindex:/usr/local/bin/synoindex:ro

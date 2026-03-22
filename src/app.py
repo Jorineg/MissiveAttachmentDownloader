@@ -22,7 +22,7 @@ class Application:
         logger.info("=" * 50)
         logger.info("Missive Attachment Downloader")
         logger.info("=" * 50)
-        logger.info(f"Storage: {settings.ATTACHMENT_STORAGE_PATH}")
+        logger.info(f"Storage paths: {[str(p) for p in settings.ATTACHMENT_STORAGE_PATHS]}")
         logger.info(f"Poll interval: {settings.POLL_INTERVAL}s")
         if settings.SKIP_SENDER_DOMAINS:
             logger.info(f"Skip outgoing from: {', '.join(settings.SKIP_SENDER_DOMAINS)}")

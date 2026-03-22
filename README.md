@@ -131,6 +131,27 @@ SELECT * FROM email_attachment_files WHERE status = 'failed';
 docker-compose logs -f
 ```
 
+## Synology Drive Sync Setup
+
+The Docker container runs as `user: "1029:100"` to match NAS file ownership (required for Synology Drive to sync downloaded files to clients).
+
+Synology Drive's indexer does not detect files created via Docker volume mounts (inotify events don't propagate). A host-level cron job re-indexes new files every 10 minutes:
+
+**Script:** `/usr/local/bin/ibh-synoindex.sh`
+```bash
+#!/bin/bash
+[ -f /tmp/.last-synoindex ] || touch -t 197001010000 /tmp/.last-synoindex
+find /volume1/_shared-ibhelm/projekte/*/IBH-INBOX /volume1/_shared-ibhelm/projekte-erledigt/*/IBH-INBOX -newer /tmp/.last-synoindex -exec synoindex -a {} + 2>/dev/null
+touch /tmp/.last-synoindex
+```
+
+**Cron entry** (in `/etc/crontab`, tab-separated, restart crond after editing):
+```
+*/10	*	*	*	*	root	/usr/local/bin/ibh-synoindex.sh
+```
+
+Note: `/etc/crontab` may be reset on DSM major updates -- re-add the entry if sync stops working after an update.
+
 ## Troubleshooting
 
 ### Downloads stuck in "downloading"
