@@ -79,7 +79,7 @@ def reconcile(dry_run: bool = False):
         att_id = str(att["missive_attachment_id"])
         filename = att["original_filename"]
         file_size = att.get("file_size")
-        project_name = att.get("project_name", "?")
+        project_name = att.get("storage_folder_name") or att.get("project_name") or "?"
         
         # Apply same skip filters as MAD
         skip_reason = app._should_skip(att)

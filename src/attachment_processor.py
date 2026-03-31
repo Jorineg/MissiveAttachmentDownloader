@@ -1,7 +1,6 @@
 """Download and save email attachments."""
 import os
 import re
-import subprocess
 import requests
 from pathlib import Path
 from datetime import datetime, timezone
@@ -73,12 +72,12 @@ class AttachmentProcessor:
         message_id = attachment['missive_message_id']
         original_filename = attachment['original_filename']
         url = attachment['original_url']
-        project_name = attachment.get('project_name') or 'Unknown'
+        storage_name = attachment.get('storage_folder_name') or attachment.get('project_name') or 'Unknown'
         delivered_at = attachment.get('delivered_at')
         sender_email = attachment.get('sender_email') or 'unknown'
         email_subject = attachment.get('email_subject') or 'no-subject'
         
-        project_folder = self._sanitize_folder(project_name)
+        project_folder = self._sanitize_folder(storage_name)
         
         base_path = self._find_project_base(project_folder)
         if not base_path:
@@ -90,8 +89,6 @@ class AttachmentProcessor:
         email_folder = self._build_email_folder(delivered_at, sender_email, email_subject)
         folder_path = base_path / project_folder / "IBH-INBOX" / email_folder
         folder_path.mkdir(parents=True, exist_ok=True)
-        self._synoindex(folder_path)
-        
         local_filename = self._generate_unique_filename(folder_path, original_filename)
         file_path = folder_path / local_filename
         relative_path = f"{project_folder}/IBH-INBOX/{email_folder}/{local_filename}"
@@ -114,7 +111,6 @@ class AttachmentProcessor:
         finally:
             os.close(fd)
         
-        self._synoindex(file_path)
         logger.info(f"Saved: {relative_path} ({len(content)} bytes)")
         return relative_path
     
@@ -184,14 +180,6 @@ class AttachmentProcessor:
         name = re.sub(r'[<>:"/\\|?*\x00-\x1f]', '_', name)
         name = name.strip(' .')
         return name[:200] if name else 'Unknown'
-    
-    @staticmethod
-    def _synoindex(path: Path):
-        """Notify Synology indexer so Drive syncs the new file/folder."""
-        try:
-            subprocess.run(["synoindex", "-a", str(path)], timeout=5, capture_output=True)
-        except FileNotFoundError:
-            pass
     
     def _is_url_expired(self, url: str, buffer_seconds: int = 60) -> bool:
         """Check if signed URL is expired or will expire soon."""

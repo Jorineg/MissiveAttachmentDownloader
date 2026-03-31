@@ -135,13 +135,15 @@ docker-compose logs -f
 
 The Docker container runs as `user: "1029:100"` to match NAS file ownership (required for Synology Drive to sync downloaded files to clients).
 
-Synology Drive's indexer does not detect files created via Docker volume mounts (inotify events don't propagate). A host-level cron job re-indexes new files every 10 minutes:
+Synology Drive detects file changes via `synotifyd` (inotify). Docker bind-mount writes don't propagate inotify events, so Drive never sees new files. Note: `synoindex -a` only feeds Synology's media/search index, NOT Drive's sync index.
+
+The fix: a host cron job that `touch`es new files, re-firing inotify so `synotifyd` picks them up.
 
 **Script:** `/usr/local/bin/ibh-synoindex.sh`
 ```bash
 #!/bin/bash
 [ -f /tmp/.last-synoindex ] || touch -t 197001010000 /tmp/.last-synoindex
-find /volume1/_shared-ibhelm/projekte/*/IBH-INBOX /volume1/_shared-ibhelm/projekte-erledigt/*/IBH-INBOX -newer /tmp/.last-synoindex -exec synoindex -a {} + 2>/dev/null
+find /volume1/_shared-ibhelm/projekte/*/IBH-INBOX /volume1/_shared-ibhelm/projekte-erledigt/*/IBH-INBOX -newer /tmp/.last-synoindex -exec touch -c {} + 2>/dev/null
 touch /tmp/.last-synoindex
 ```
 
@@ -151,6 +153,8 @@ touch /tmp/.last-synoindex
 ```
 
 Note: `/etc/crontab` may be reset on DSM major updates -- re-add the entry if sync stops working after an update.
+
+**Caution:** `touch` updates file mtime. The cron job only touches files newer than the last run (max 10 min drift). For a bulk catch-up of older files, use `-newermt` to limit scope and avoid destroying file timestamps.
 
 ## Troubleshooting
 

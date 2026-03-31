@@ -30,4 +30,3 @@ services:
       - /volume1/_shared-ibhelm/projekte:/data/projekte
       - /volume1/_shared-ibhelm/projekte-erledigt:/data/projekte-erledigt
       - ./logs:/app/logs
-      - /usr/syno/bin/synoindex:/usr/local/bin/synoindex:ro
